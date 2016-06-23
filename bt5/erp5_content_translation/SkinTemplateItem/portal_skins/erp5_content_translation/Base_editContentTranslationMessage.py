@@ -19,7 +19,7 @@ if dialog_id not in ('', None):
 # Prevent users who don't have rights to edit the object from
 # editing it by calling the Base_edit script with correct
 # parameters directly.
-if not silent_mode and not request.AUTHENTICATED_USER.has_permission('Modify portal content', context) :
+if not (silent_mode and _guard_result):
   msg = Base_translateString("You do not have the permissions to edit the object.")
   redirect_url = '%s/%s?selection_index=%s&selection_name=%s&%s' % (context.absolute_url(), form_id, selection_index, selection_name, 'portal_status_message=%s' % msg)
   return request['RESPONSE'].redirect(redirect_url)
