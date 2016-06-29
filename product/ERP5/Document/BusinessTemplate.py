@@ -613,8 +613,8 @@ class BaseTemplateItem(Implicit, Persistent):
       # PythonScript covers both Zope Python scripts
       # and ERP5 Python Scripts
       if isinstance(obj, PythonScript):
-        attr_set.update(('func_code', 'func_defaults', '_code',
-                         '_lazy_compilation', 'Python_magic'))
+        attr_set.update(('func_code', 'func_defaults', '_guard_result',
+                         '_code', '_lazy_compilation', 'Python_magic'))
         for attr in 'errors', 'warnings', '_proxy_roles':
           if not obj.__dict__.get(attr, 1):
             delattr(obj, attr)

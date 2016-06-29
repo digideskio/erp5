@@ -3087,6 +3087,17 @@ class TestERP5Type(PropertySheetTestCase, LogInterceptor):
       script.manage_setGuard({})
       self.assertEqual(script(1), 2)
       self.assertTrue(script.checkGuard())
+      body = 'return x, _guard_result'
+      script.ZPythonScript_edit('x=3, _guard_result=1', body)
+      self.assertRaisesRegexp(ValueError, "default", script)
+      script.ZPythonScript_edit('x=3, _guard_result=None', body)
+      self.assertRaisesRegexp(ValueError, "no Guard", script)
+      script.manage_setGuard({'guard_roles': 'Member'})
+      self.assertEqual(script(), (3, 1))
+      script.manage_setGuard({'guard_roles': 'Manager'})
+      self.assertEqual(script(), (3, 0))
+      script.ZPythonScript_edit('_guard_result, x', body)
+      self.assertEqual(script(2), (2, 0))
 
 
 class TestAccessControl(ERP5TypeTestCase):

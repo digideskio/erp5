@@ -1349,9 +1349,11 @@ def optimize():
   Expression.__init__ = __init__
 
   # Delay the compilations of Python Scripts until they are really executed.
-  # Python Scripts are exported without those 2 attributes:
+  # Python Scripts are exported without those 3 attributes:
   PythonScript.func_code = lazy_func_prop('func_code', None)
   PythonScript.func_defaults = lazy_func_prop('func_defaults', None)
+  PythonScript._guard_result = lazy_func_prop('_guard_result',
+                                              PythonScript._guard_result)
 
   def _compile(self):
     if immediate_compilation:
@@ -1360,11 +1362,6 @@ def optimize():
     for name in lazy_func_prop.default_dict:
       self.__dict__.pop(name, None)
   PythonScript._compile = _compile
-  PythonScript_exec = PythonScript._exec
-  def _exec(self, *args):
-    self.func_code # trigger compilation if needed
-    return PythonScript_exec(self, *args)
-  PythonScript._exec = _exec
   from Acquisition import aq_parent
   def _makeFunction(self, dummy=0): # CMFCore.FSPythonScript uses dummy arg.
     self.ZCacheable_invalidate()

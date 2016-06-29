@@ -14,10 +14,11 @@
 from inspect import getargs
 from types import MethodType
 from Products.ExternalMethod.ExternalMethod import *
+from Shared.DC.Scripts.Signature import FuncCode
 from Products.ERP5Type.Globals import InitializeClass
 from zLOG import LOG, WARNING
 from . import PatchClass
-from .PythonScript import addGuard
+from .PythonScript import addGuard, extractGuardResultArgument
 
 class _(PatchClass(ExternalMethod)):
 
@@ -73,15 +74,20 @@ class _(PatchClass(ExternalMethod)):
                 return _f
         except AttributeError:
             pass
-        code = f.func_code
-        args = getargs(code)[0]
-        i = isinstance(f, MethodType)
-        ff = f.__func__ if i else f
-        has_self = len(args) > i and args[i] == 'self'
-        i += has_self
-        if i:
-            code = FuncCode(ff, i)
-        self._v_f = _f = (f, f.func_defaults, code, has_self)
+        args, varargs, keywords = getargs(f.func_code)
+        if isinstance(f, MethodType):
+          del args[0]
+        has_self = args[0] == 'self' if args else 0
+        args, defaults, guard_result = extractGuardResultArgument(
+            args[has_self:], f.func_defaults)
+        # XXX: Same as for PythonScript
+        n = len(args)
+        if varargs:
+            args.append(varargs)
+        if keywords:
+            args.append(keywords)
+        self._v_f = _f = (f, defaults, FuncCode(args, n),
+                          has_self, guard_result)
         return _f
 
     def __call__(self, *args, **kw):
@@ -93,10 +99,13 @@ class _(PatchClass(ExternalMethod)):
         if first argument is 'self', and only in this case, the
         acquisition parent is passed as first positional parameter.
         """
-        self.checkGuard(True)
-
         _f = self._getFunction()
         __traceback_info__ = args, kw, _f[1]
+
+        if _f[4] is None:
+          self.checkGuard(True)
+        else:
+          args = self._addGuardResult(_f[4], args, kw)
 
         if _f[3]:
             return _f[0](self.aq_parent, *args, **kw)
