@@ -45,10 +45,13 @@ class Guard:
   roles = ()
   groups = ()
   expr = None
+  proxy = None
 
   guardForm = DTMLFile('guard', _dtmldir)
 
   def __call__(self, ob):
+    if self.proxy:
+      return getattr(ob, self.proxy).checkGuard()
     sm = getSecurityManager()
     # returns 1 if self passes against ob, else 0.
     if self.permissions:
@@ -92,16 +95,20 @@ class Guard:
       self = cls()
     if props is None:
       props = {}
-    for x in 'permissions', 'roles', 'groups', 'expr':
+    for x in 'proxy', 'permissions', 'roles', 'groups', 'expr':
       new = props.get('guard_' + x, '').strip()
       old = getattr(self, x)
       if x == 'expr':
         old = getattr(old, 'text', '')
-      else:
+      elif x != 'proxy':
         new = tuple(new.strip() for new in new.split(';')) if new else ()
+      elif not new:
+        new = None
       if new != old:
         if new:
           setattr(self, x, Expression(new) if x == 'expr' else new)
+          if x == 'proxy':
+            props = {}
         else:
           delattr(self, x)
         change = 1
@@ -123,3 +130,5 @@ class Guard:
 
   def getExprText(self):
     return getattr(self.expr, 'text', '')
+
+  # TODO: getProxyText & dtml

@@ -63,7 +63,7 @@ def checkGuard(aq_parent=aq_parent):
     guard = self.guard
     if guard is None or guard(aq_parent(self)):
       return 1
-    if _exec:
+    if _exec: # and not guard.proxy ?
       raise Forbidden('Calling %s %s is denied by Guard.'
                       % (self.meta_type, self.id))
   return checkGuard
