@@ -10,21 +10,22 @@
 # FOR A PARTICULAR PURPOSE
 #
 ##############################################################################
-from Products.DCWorkflow.Guard import Guard
 from Products.PythonScripts.PythonScript import PythonScript
 from App.special_dtml import DTMLFile
 from .. import _dtmldir
-from ..Utils import createExpressionContext
+from ..Guard import Guard
 from . import PatchClass
-from AccessControl import ClassSecurityInfo, getSecurityManager
+from AccessControl import ClassSecurityInfo
 from AccessControl.class_init import InitializeClass
-from AccessControl.PermissionRole import rolesForPermissionOn
 from OFS.misc_ import p_
 from App.ImageFile import ImageFile
 from Acquisition import aq_base, aq_parent
 from zExceptions import Forbidden
 
 ### Guards
+
+from Products.DCWorkflow.Guard import Guard as DCGuard
+DCGuard.__call__ = Guard.__call__.__func__
 
 _guard_manage_options = (
   {
@@ -47,22 +48,7 @@ def manage_guardForm(self, REQUEST, manage_tabs_message=None):
 def manage_setGuard(self, props=None, REQUEST=None):
   '''
   '''
-  g = Guard()
-  if g.changeFromProperties(props or REQUEST):
-    guard = self.guard
-    if guard is None:
-      self.guard = g
-    else:
-      guard._p_activate()
-      if guard.__dict__ != g.__dict__:
-        guard.__dict__.clear()
-        guard.__dict__.update(g.__dict__)
-        guard._p_changed = 1
-  else:
-    try:
-      del self.guard
-    except AttributeError:
-      pass
+  Guard._edit(self, 'guard', props or REQUEST)
   if REQUEST is not None:
     return self.manage_guardForm(REQUEST, 'Properties changed.')
 
@@ -72,55 +58,10 @@ def getGuard(self):
     return Guard().__of__(self)  # Create a temporary guard.
   return guard
 
-def getRoles(ob):
-  sm = getSecurityManager()
-  stack = sm._context.stack
-  if stack:
-    proxy_roles = getattr(stack[-1], '_proxy_roles', None)
-    if proxy_roles:
-      return set(proxy_roles)
-  return set(sm.getUser().getRolesInContext(ob))
-
-def _checkGuard(guard, ob):
-  # returns 1 if guard passes against ob, else 0.
-  if guard.permissions:
-    # Require at least one role for required roles for the given permission.
-    u_roles = getRoles(ob)
-    for p in guard.permissions:
-      if not u_roles.isdisjoint(rolesForPermissionOn(p, ob)):
-        break
-    else:
-      return 0
-  else:
-    u_roles = None
-  if guard.roles:
-    # Require at least one of the given roles.
-    if u_roles is None:
-      u_roles = getRoles(ob)
-    if u_roles.isdisjoint(guard.roles):
-      return 0
-  if guard.groups:
-    # Require at least one of the specified groups.
-    sm = getSecurityManager()
-    u = sm.getUser()
-    b = aq_base( u )
-    if hasattr( b, 'getGroupsInContext' ):
-      u_groups = u.getGroupsInContext( ob )
-    elif hasattr( b, 'getGroups' ):
-      u_groups = u.getGroups()
-    else:
-      u_groups = ()
-    for group in guard.groups:
-      if group in u_groups:
-        break
-    else:
-      return 0
-  return guard.expr is None or guard.expr(createExpressionContext(ob))
-
-def checkGuard(aq_parent=aq_parent, _checkGuard=_checkGuard):
+def checkGuard(aq_parent=aq_parent):
   def checkGuard(self, _exec=False):
     guard = self.guard
-    if guard is None or _checkGuard(guard, aq_parent(self)):
+    if guard is None or guard(aq_parent(self)):
       return 1
     if _exec:
       raise Forbidden('Calling %s %s is denied by Guard.'
@@ -128,7 +69,7 @@ def checkGuard(aq_parent=aq_parent, _checkGuard=_checkGuard):
   return checkGuard
 checkGuard = checkGuard()
 
-def _addGuardResult(aq_parent=aq_parent, _checkGuard=_checkGuard):
+def _addGuardResult(aq_parent=aq_parent):
   def _addGuardResult(self, pos, args, kw):
     if pos < 0:
       raise ValueError("The only allowed default value for"
@@ -140,8 +81,8 @@ def _addGuardResult(aq_parent=aq_parent, _checkGuard=_checkGuard):
     if guard is None:
       raise ValueError("Can't set '_guard_result': no Guard defined")
     if pos < len(args):
-      return args[:pos] + (_checkGuard(guard, aq_parent(self)),) + args[pos:]
-    kw['_guard_result'] = _checkGuard(guard, aq_parent(self))
+      return args[:pos] + (guard(aq_parent(self)),) + args[pos:]
+    kw['_guard_result'] = guard(aq_parent(self))
     return args
   return _addGuardResult
 _addGuardResult = _addGuardResult()
